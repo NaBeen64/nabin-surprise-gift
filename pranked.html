@@ -1,0 +1,387 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>System Alert</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+
+    body {
+      background: #000;
+      color: #00ff41;
+      font-family: 'Courier New', monospace;
+      overflow: hidden;
+      height: 100vh;
+      width: 100vw;
+    }
+
+    #matrix { position: fixed; top: 0; left: 0; z-index: 0; opacity: 0.18; }
+
+    #screen {
+      position: relative; z-index: 10;
+      display: flex; flex-direction: column;
+      align-items: center; justify-content: center;
+      height: 100vh; padding: 20px; text-align: left;
+    }
+
+    .terminal {
+      background: rgba(0,0,0,0.88);
+      border: 2px solid #00ff41;
+      border-radius: 6px;
+      padding: 24px 28px;
+      max-width: 680px; width: 100%;
+      box-shadow: 0 0 40px #00ff4188, 0 0 80px #00ff4122;
+    }
+
+    .titlebar {
+      display: flex; align-items: center; gap: 8px;
+      margin-bottom: 18px; padding-bottom: 10px;
+      border-bottom: 1px solid #00ff4144;
+    }
+    .dot { width: 12px; height: 12px; border-radius: 50%; }
+    .dot.r { background: #ff5f57; }
+    .dot.y { background: #ffbd2e; }
+    .dot.g { background: #28ca41; }
+    .titlebar span { color: #00ff4199; font-size: 13px; margin-left: 8px; }
+
+    .line { font-size: 14px; line-height: 1.7; min-height: 22px; }
+    .line.red    { color: #ff3333; }
+    .line.yellow { color: #ffcc00; }
+    .line.white  { color: #ffffff; }
+    .line.dim    { color: #00ff4166; }
+
+    #log { margin-bottom: 12px; }
+
+    .skull {
+      color: #ff3333;
+      font-size: clamp(36px, 8vw, 64px);
+      text-align: center;
+      animation: pulse 0.8s infinite alternate;
+      margin: 10px 0;
+      display: none;
+    }
+    @keyframes pulse { from { text-shadow: 0 0 10px #ff3333; } to { text-shadow: 0 0 40px #ff0000, 0 0 80px #ff000066; } }
+
+    #progressWrap { margin: 10px 0; display: none; }
+    #progressLabel { font-size: 13px; color: #ffcc00; margin-bottom: 4px; }
+    #progressBar {
+      height: 14px; background: #001a00; border: 1px solid #00ff41;
+      border-radius: 3px; overflow: hidden;
+    }
+    #progressFill {
+      height: 100%; width: 0%; background: linear-gradient(90deg, #00ff41, #ff3333);
+      transition: width 0.15s;
+    }
+
+    #countdown {
+      font-size: clamp(28px, 7vw, 52px); color: #ff3333; text-align: center;
+      font-weight: bold; display: none; letter-spacing: 4px;
+      animation: blink 0.5s step-end infinite;
+      text-shadow: 0 0 20px #ff3333;
+    }
+    @keyframes blink { 50% { opacity: 0.4; } }
+
+    /* ── PRANKED screen ── */
+    #pranked {
+      display: none; flex-direction: column;
+      align-items: center; justify-content: center;
+      text-align: center; gap: 14px; width: 100%; max-width: 520px;
+    }
+    .big-emoji { font-size: clamp(60px, 15vw, 90px); animation: bounce 0.6s infinite alternate; }
+    @keyframes bounce { from { transform: scale(1); } to { transform: scale(1.15); } }
+    .prank-title {
+      font-size: clamp(28px, 8vw, 52px); font-weight: bold;
+      color: #ffcc00; text-shadow: 0 0 20px #ffcc00;
+      letter-spacing: 3px;
+    }
+    .prank-sub { font-size: 17px; color: #ffffff; }
+    .confetti-row { font-size: 26px; letter-spacing: 6px; }
+
+    /* ── Feedback Box ── */
+    .feed-box {
+      background: rgba(0,0,0,0.85);
+      border: 1.5px solid #00ff4155;
+      border-radius: 10px;
+      padding: 20px 22px;
+      width: 100%; max-width: 440px;
+      margin-top: 4px;
+    }
+    .feed-title { color: #fff; font-size: 15px; font-family: sans-serif; margin-bottom: 14px; text-align: center; }
+    .name-row { display: flex; gap: 8px; margin-bottom: 14px; }
+    .name-input {
+      flex: 1; background: #0a0a0a; border: 1px solid #00ff4144;
+      color: #fff; padding: 9px 12px; border-radius: 6px;
+      font-size: 13px; font-family: sans-serif; outline: none;
+    }
+    .name-input:focus { border-color: #00ff41; }
+    .react-row { display: flex; gap: 8px; margin-bottom: 14px; }
+    .react-btn {
+      flex: 1; background: #0a0a0a; border: 1.5px solid #00ff4133;
+      border-radius: 8px; padding: 10px 6px; text-align: center;
+      cursor: pointer; transition: .15s; user-select: none;
+    }
+    .react-btn:hover { border-color: #00ff4188; background: #001500; }
+    .react-btn.sel { border-color: #00ff41; background: #002200; }
+    .react-emoji { font-size: 22px; display: block; margin-bottom: 4px; }
+    .react-label { color: #aaffaa; font-size: 11px; font-family: sans-serif; }
+    .submit-btn {
+      width: 100%; background: #00ff41; color: #000; border: none;
+      padding: 11px; border-radius: 7px; font-size: 14px; font-weight: bold;
+      font-family: sans-serif; cursor: pointer;
+    }
+    .submit-btn:hover { background: #00cc33; }
+    .submit-btn:disabled { opacity: .4; cursor: not-allowed; }
+    .submit-msg { text-align: center; font-size: 13px; font-family: sans-serif; margin-top: 10px; display: none; }
+
+    body::after {
+      content: ''; position: fixed; inset: 0; z-index: 999; pointer-events: none;
+      background: repeating-linear-gradient(0deg, transparent, transparent 2px, rgba(0,0,0,0.07) 2px, rgba(0,0,0,0.07) 4px);
+    }
+  </style>
+</head>
+<body>
+
+<canvas id="matrix"></canvas>
+
+<div id="screen">
+  <div class="terminal" id="terminalBox">
+    <div class="titlebar">
+      <div class="dot r"></div><div class="dot y"></div><div class="dot g"></div>
+      <span>root@system — bash — 80×24</span>
+    </div>
+    <div id="log"></div>
+    <div class="skull" id="skull">☠️</div>
+    <div id="progressWrap">
+      <div id="progressLabel">Extracting data... 0%</div>
+      <div id="progressBar"><div id="progressFill"></div></div>
+    </div>
+    <div id="countdown"></div>
+  </div>
+
+  <div id="pranked">
+    <div class="big-emoji">😂</div>
+    <div class="prank-title">HAINA hai yo  PRANKED ho !!</div>
+    <div class="prank-sub">तिम्रो device बिल्कुल <span style="color:#00ff41">SAFE</span> छ 🛡️</div>
+    <div class="prank-sub" style="color:#00ff41; font-size:14px;">यो सिर्फ एउटा मज्जाको prank थियो!if feri ystai aru link xodeu bhane pakka real hacker harule hack garne xa ni </div>
+    <div class="confetti-row">🎊 🤣 🎉 😂 🎊</div>
+
+    <!-- Feedback -->
+    <div class="feed-box">
+      <div class="feed-title">😁 तिम्रो reaction के थियो? बताउनुस्!</div>
+      <div class="name-row">
+        <input class="name-input" id="nameInput" placeholder="नाम लेख्नुस् (optional)..." />
+      </div>
+      <div class="react-row">
+        <div class="react-btn" onclick="pick(this,'😱 डरायो')">
+          <span class="react-emoji">😱</span>
+          <div class="react-label">डरायो!</div>
+        </div>
+        <div class="react-btn" onclick="pick(this,'😎 डरायेन')">
+          <span class="react-emoji">😎</span>
+          <div class="react-label">डरायेन</div>
+        </div>
+        <div class="react-btn" onclick="pick(this,'🤓 थाहा थियो')">
+          <span class="react-emoji">🤓</span>
+          <div class="react-label">थाहा थियो</div>
+        </div>
+      </div>
+      <button class="submit-btn" id="submitBtn" onclick="sendFeedback()" disabled>🚀 Send Feedback</button>
+      <div class="submit-msg" id="submitMsg"></div>
+    </div>
+  </div>
+</div>
+
+<script>
+// ══ REPLACE THIS with your Apps Script Web App URL ══
+const SHEET_WEBHOOK = 'https://script.google.com/macros/s/AKfycbw-dveXZqSp3NMfkhhBeDqkphozaRLouzA_rcK_xZ0Zl2vQS5nXtKoWoUsmHB2vEgpN/exec';
+
+// ── Matrix Rain ──
+const canvas = document.getElementById('matrix');
+const ctx = canvas.getContext('2d');
+canvas.width = window.innerWidth; canvas.height = window.innerHeight;
+const cols = Math.floor(canvas.width / 16);
+const drops = Array(cols).fill(1);
+function drawMatrix() {
+  ctx.fillStyle = 'rgba(0,0,0,0.05)';
+  ctx.fillRect(0, 0, canvas.width, canvas.height);
+  ctx.fillStyle = '#00ff41'; ctx.font = '14px monospace';
+  drops.forEach((y, i) => {
+    ctx.fillText(String.fromCharCode(0x30A0 + Math.random() * 96), i * 16, y * 16);
+    if (y * 16 > canvas.height && Math.random() > 0.975) drops[i] = 0;
+    drops[i]++;
+  });
+}
+setInterval(drawMatrix, 50);
+
+// ── Web Audio ──
+let AC;
+function ac() { if (!AC) AC = new (window.AudioContext || window.webkitAudioContext)(); return AC; }
+
+function beep(freq, dur, vol = 0.25, type = 'square') {
+  try {
+    const a = ac(), o = a.createOscillator(), g = a.createGain();
+    o.connect(g); g.connect(a.destination);
+    o.type = type; o.frequency.value = freq;
+    g.gain.setValueAtTime(vol, a.currentTime);
+    g.gain.exponentialRampToValueAtTime(0.001, a.currentTime + dur);
+    o.start(); o.stop(a.currentTime + dur);
+  } catch(e) {}
+}
+
+function glitchSound() {
+  let i = 0;
+  const iv = setInterval(() => {
+    beep(80 + Math.random() * 900, 0.06, 0.12, 'sawtooth');
+    if (++i > 25) clearInterval(iv);
+  }, 110);
+}
+
+function alarmBeep() {
+  beep(880, 0.18, 0.35, 'square');
+  setTimeout(() => beep(660, 0.18, 0.3, 'square'), 180);
+}
+
+function laughSound() {
+  // Synthesized laugh: descending pitch bursts
+  [0, 220, 440, 660, 880].forEach((t, i) => {
+    setTimeout(() => beep(350 - i * 20, 0.22, 0.3, 'sine'), t);
+  });
+  // Speech laugh if supported
+  if ('speechSynthesis' in window) {
+    const u = new SpeechSynthesisUtterance('Ha ha ha ha ha ha!');
+    u.lang = 'en-US'; u.pitch = 0.6; u.rate = 0.9; u.volume = 0.9;
+    window.speechSynthesis.speak(u);
+  }
+}
+
+// ── Terminal ──
+const log = document.getElementById('log');
+function addLine(text, cls = '', delay = 0) {
+  return new Promise(res => setTimeout(() => {
+    const d = document.createElement('div');
+    d.className = 'line ' + cls;
+    d.textContent = text;
+    log.appendChild(d);
+    log.scrollTop = log.scrollHeight;
+    res();
+  }, delay));
+}
+
+function animateProgress() {
+  return new Promise(res => {
+    document.getElementById('progressWrap').style.display = 'block';
+    const fill = document.getElementById('progressFill');
+    const label = document.getElementById('progressLabel');
+    let pct = 0;
+    const iv = setInterval(() => {
+      pct += Math.random() * 4 + 1;
+      if (pct >= 100) { pct = 100; clearInterval(iv); setTimeout(res, 300); }
+      fill.style.width = pct + '%';
+      label.textContent = `Extracting data... ${Math.floor(pct)}%`;
+      if (Math.random() > 0.65) beep(150 + Math.random() * 500, 0.05, 0.07, 'sawtooth');
+    }, 85);
+  });
+}
+
+function showCountdown(from) {
+  return new Promise(res => {
+    const cd = document.getElementById('countdown');
+    cd.style.display = 'block';
+    let n = from;
+    cd.textContent = `⏳ DELETING IN: ${n}s`;
+    alarmBeep();
+    const iv = setInterval(() => {
+      n--;
+      if (n <= 0) { clearInterval(iv); cd.style.display = 'none'; res(); }
+      else { cd.textContent = `⏳ DELETING IN: ${n}s`; alarmBeep(); }
+    }, 1000);
+  });
+}
+
+// ── Main sequence ──
+async function run() {
+  await addLine('$ sudo access --target=device --silent', 'dim', 0);
+  await addLine('[✓] Connection established via port 443', '', 600);
+  glitchSound();
+  await addLine('[✓] Bypass firewall... SUCCESS', '', 500);
+  await addLine('[!] WARNING: Unauthorized access detected', 'yellow', 700);
+  await addLine('', '', 300);
+  await addLine('> Scanning device...', '', 400);
+  await addLine('  ├─ OS: ' + (navigator.platform || 'Unknown OS'), '', 300);
+  await addLine('  ├─ Browser: ' + (navigator.userAgent.split(') ')[0].split('(')[1] || 'Unknown'), 'white', 300);
+  await addLine('  ├─ Language: ' + navigator.language, '', 300);
+  await addLine('  └─ Screen: ' + screen.width + 'x' + screen.height, '', 300);
+  await addLine('', '', 200);
+  beep(120, 0.6, 0.4, 'sawtooth');
+  await addLine('[!!!] DEVICE HACKED SUCCESSFULLY', 'red', 500);
+
+  document.getElementById('skull').style.display = 'block';
+
+  await addLine('', '', 400);
+  await addLine('> Starting data extraction...', 'yellow', 300);
+  await animateProgress();
+
+  await addLine('[✓] Photos: 1,247 files copied', 'red', 200);
+  await addLine('[✓] Contacts: 384 entries stolen', 'red', 200);
+  await addLine('[✓] Messages: 12,091 read', 'red', 200);
+  await addLine('', '', 300);
+  await addLine('> Initiating remote wipe in...', 'red', 400);
+
+  await showCountdown(5);
+
+  // REVEAL
+  laughSound();
+  document.getElementById('terminalBox').style.display = 'none';
+  document.getElementById('pranked').style.display = 'flex';
+}
+
+run();
+
+// ── Feedback ──
+let picked = null;
+function pick(el, val) {
+  document.querySelectorAll('.react-btn').forEach(b => b.classList.remove('sel'));
+  el.classList.add('sel');
+  picked = val;
+  document.getElementById('submitBtn').disabled = false;
+}
+
+async function sendFeedback() {
+  const name = document.getElementById('nameInput').value.trim() || 'Anonymous';
+  const btn = document.getElementById('submitBtn');
+  const msg = document.getElementById('submitMsg');
+  if (!picked) return;
+
+  btn.disabled = true;
+  btn.textContent = 'Sending...';
+
+  const payload = {
+    name,
+    reaction: picked,
+    time: new Date().toLocaleString('en-NP', { timeZone: 'Asia/Kathmandu' }),
+    device: navigator.platform + ' | ' + screen.width + 'x' + screen.height
+  };
+
+  try {
+    await fetch(SHEET_WEBHOOK, {
+      method: 'POST',
+      mode: 'no-cors',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload)
+    });
+    msg.style.display = 'block';
+    msg.style.color = '#00ff41';
+    msg.textContent = '✅ धन्यवाद! तिम्रो response पुग्यो 🙏';
+    btn.textContent = '✓ Sent!';
+  } catch (e) {
+    msg.style.display = 'block';
+    msg.style.color = '#ff6666';
+    msg.textContent = '⚠️ Error — please try again!';
+    btn.disabled = false;
+    btn.textContent = '🚀 Send Feedback';
+  }
+}
+</script>
+</body>
+</html>
